@@ -1,6 +1,7 @@
 const express = require("express");
 const app = express();
 const PORT = 8080; // default port 8080
+const cookieParser = require("cookie-parser");
 app.set("view engine", "ejs"); //EJS
 
 const urlDatabase = {
@@ -8,33 +9,33 @@ const urlDatabase = {
   "9sm5xK": "http://www.google.com"
 };
 
+app.use(cookieParser());
+
 app.use(express.urlencoded({ extended: true })); //Parser to convert buffer data into strings we can use 
 
 app.get("/", (req, res) => {
-  res.send("Hello!");
+  res.send("Test");
 });
 
-app.get("/urls.json", (req, res) => {
-  res.json(urlDatabase);
+app.get("/urls", (req, res) => {
+  const templateVars = {
+    username: req.cookies["username"], // Pass the username using the 'username' key
+    urls: urlDatabase, 
+  };
+  res.render("urls_index", templateVars); // Render the 'urls_index' view and pass templateVars
 });
 
-app.get("/hello", (req, res) => {
-  res.send("<html><body>Hello <b>World</b></body></html>\n");
-});
-
-app.get("/urls", (req, res) => { //Connects to urls_index.ejs
-  const templateVars = { urls: urlDatabase };
-  res.render("urls_index", templateVars);
-});
-
-app.get("/urls/new", (req, res) => { //Connects to form to make new URL, has to be shown before urls/id
-  res.render("urls_new"); 
+app.get("/urls/new", (req, res) => {
+  const templateVars = {
+    username: req.cookies["username"],
+  };
+  res.render("urls_new", templateVars);
 });
 
 app.get("/urls/:id", (req, res) => { //Connects to single URL (replaced by ID)
   const id = req.params.id; // Extract the id from the URL
   const longURL = urlDatabase[id]; // Retrieve the long URL from the urlDatabase using the id as the key
-  const templateVars = { id: id, longURL: longURL }; // Create the templateVars object to pass to the template
+  const templateVars = { id: id, longURL: longURL, username: req.cookies["username"] }; // Create the templateVars object to pass to the template
   res.render("urls_show", templateVars);
 });
 
@@ -93,6 +94,13 @@ app.post("/urls/:id", (req, res) => {
   } else {
     res.status(404).send("Short URL not found");
   }
+});
+
+//Logout
+app.post("/logout", (req, res) => {
+  // Clear the 'username' cookie
+  res.clearCookie("username");
+  res.redirect("/urls");
 });
 
 app.listen(PORT, () => {
