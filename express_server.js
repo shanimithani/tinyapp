@@ -65,6 +65,19 @@ app.post("/urls", (req, res) => {
   res.redirect(`/urls/${shortURL}`);
 });
 
+//Delete URLs
+app.post("/urls/:id/delete", (req, res) => {
+  const shortURL = req.params.id; // Get the shortURL 
+
+  if (urlDatabase[shortURL]) {
+    // If the shortURL exists in the urlDatabase, remove it using the delete operator
+    delete urlDatabase[shortURL];
+    res.redirect("/urls"); 
+  } else {
+    res.status(404).send("Short URL not found");
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Example app listening on port ${PORT}!`);
 });
