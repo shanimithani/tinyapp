@@ -78,6 +78,19 @@ app.post("/urls/:id/delete", (req, res) => {
   }
 });
 
+//Update URLs
+app.post("/urls/:id", (req, res) => {
+  const shortURL = req.params.id; // Get the shortURL from the request parameter 
+  const newLongURL = req.body.longURL; // Get the new longURL 
+
+  if (urlDatabase[shortURL]) {
+    urlDatabase[shortURL] = newLongURL;
+    res.redirect("/urls"); // Redirect the client back to the urls_index page
+  } else {
+    res.status(404).send("Short URL not found");
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Example app listening on port ${PORT}!`);
 });
