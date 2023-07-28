@@ -51,11 +51,6 @@ app.get("/u/:id", (req, res) => { //The actual redirects
 
 
 app.post("/urls", (req, res) => {
-  console.log(req.body); // Log the POST request body to the console
-  res.send("Ok"); // Respond with 'Ok' (we will replace this)
-});
-
-app.post("/urls", (req, res) => {
   const longURL = req.body.longURL; // Get the long URL from the form submission
   // Generate a unique short URL ID using the generateRandomString function
   const shortURL = generateRandomString();
@@ -63,6 +58,15 @@ app.post("/urls", (req, res) => {
   urlDatabase[shortURL] = longURL;
   // Redirect the user to the URL show page for the newly created short URL
   res.redirect(`/urls/${shortURL}`);
+});
+
+//Login
+app.post("/login", (req, res) => {
+  const { username } = req.body; // Get the value sin the login form
+  // Set the cookie named 'username' 
+  res.cookie("username", username);
+  // Redirect 
+  res.redirect("/urls");
 });
 
 //Delete URLs
