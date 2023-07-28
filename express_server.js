@@ -38,9 +38,31 @@ app.get("/urls/:id", (req, res) => { //Connects to single URL (replaced by ID)
   res.render("urls_show", templateVars);
 });
 
+app.get("/u/:id", (req, res) => { //The actual redirects
+  const shortURL = req.params.id; // Get the shortURL from the request parameter 
+  const longURL = urlDatabase[shortURL]; // Look up the longURL from the urlDatabase 
+  if (longURL) {
+    // If the longURL exists in the urlDatabase, redirect the user to the longURL
+    res.redirect(longURL);
+  } else {
+    res.status(404).send("Short URL not found");
+  }
+});
+
+
 app.post("/urls", (req, res) => {
   console.log(req.body); // Log the POST request body to the console
   res.send("Ok"); // Respond with 'Ok' (we will replace this)
+});
+
+app.post("/urls", (req, res) => {
+  const longURL = req.body.longURL; // Get the long URL from the form submission
+  // Generate a unique short URL ID using the generateRandomString function
+  const shortURL = generateRandomString();
+  // Add the new URL to the urlDatabase with the generated short URL ID as the key
+  urlDatabase[shortURL] = longURL;
+  // Redirect the user to the URL show page for the newly created short URL
+  res.redirect(`/urls/${shortURL}`);
 });
 
 app.listen(PORT, () => {
