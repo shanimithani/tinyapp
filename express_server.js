@@ -4,9 +4,16 @@ const PORT = 8080; // default port 8080
 app.set("view engine", "ejs"); //EJS
 const cookieParser = require("cookie-parser");
 app.use(cookieParser());
+
 const urlDatabase = {
-  "b2xVn2": "http://www.lighthouselabs.ca",
-  "9sm5xK": "http://www.google.com"
+  b2xVn2: {
+    longURL: "http://www.lighthouselabs.ca",
+    userID: "userRandomID",
+  },
+  asm5xK: {
+    longURL: "http://www.google.com",
+    userID: "user2RandomID",
+  },
 };
 
 const users = {
@@ -21,6 +28,16 @@ const users = {
     password: "dishwasher-funk",
   },
 };
+
+function getUserUrls(userId) {
+  const userUrls = {};
+  for (const shortURL in urlDatabase) {
+    if (urlDatabase[shortURL].userID === userId) {
+      userUrls[shortURL] = urlDatabase[shortURL];
+    }
+  }
+  return userUrls;
+}
 
 app.use(express.urlencoded({ extended: true })); //Parser to convert buffer data into strings we can use 
 
@@ -52,7 +69,7 @@ app.get("/login", (req, res) => {
     res.redirect("/urls");
   } else {
     // User is not logged in
-    res.render("login");
+    res.render("login", { user });
   }
 });
 
@@ -69,14 +86,16 @@ app.get("/register", (req, res) => {
 });
 
 app.get("/urls", (req, res) => {
-  const userId = req.cookies["user_id"]; // Correct variable name
-  const user = users[userId]; // Correct variable name
+  const userId = req.cookies["user_id"];
+  const user = users[userId];
+  const userUrls = getUserUrls(userId); // Helper function to get URLs for a specific user
   const templateVars = {
-    user, // Pass the user object
-    urls: urlDatabase,
+    user,
+    urls: userUrls,
   };
   res.render("urls_index", templateVars);
 });
+
 
 
 /**app.get("/urls/new", (req, res) => { //Connects to form to make new URL, has to be shown before urls/id
@@ -92,25 +111,32 @@ app.get("/urls/:id", (req, res) => { //Connects to single URL (replaced by ID)
 
 
 app.get("/urls/new", (req, res) => {
-  const userId = req.cookies.user_id;
+  const userId = req.cookies["user_id"];
   const user = users[userId];
+
   if (user) {
-    // User is logged in
-    res.render("urls_new", { user });
-  } else { 
+    const templateVars = {
+      user,
+    };
+    res.render("urls_new", templateVars);
+  } else {
     res.redirect("/login");
   }
 });
 
 app.get("/urls/:id", (req, res) => {
   const id = req.params.id;
-  const longURL = urlDatabase[id];
+  const urlInfo = urlDatabase[id]; // Get the entire object 
+  const longURL = urlInfo ? urlInfo.longURL : undefined; // Access longURL property 
   const userId = req.cookies["user_id"];
   const user = users[userId];
   const templateVars = { id, longURL, user };
   res.render("urls_show", templateVars);
 });
 
+
+
+//Redirect
 app.get("/u/:id", (req, res) => {
   const shortURL = req.params.id;
   const longURL = urlDatabase[shortURL];
@@ -174,20 +200,20 @@ app.post("/login", (req, res) => {
 
 
 app.post("/urls", (req, res) => {
-  const userId = req.cookies.user_id;
+  const userId = req.cookies["user_id"];
   const user = users[userId];
+
   if (user) {
-    // User is logged in, allow URL creation
     const longURL = req.body.longURL;
     if (longURL) {
       const shortURL = generateRandomString();
-      urlDatabase[shortURL] = longURL;
-      // Redirect the user 
+      urlDatabase[shortURL] = { longURL, userID: userId }; // Update the urlDatabase with the new structure
       res.redirect(`/urls/${shortURL}`);
     } else {
       res.status(400).send("Invalid URL. Please provide a valid URL.");
     }
   } else {
+    // User is not logged in, respond with an error message
     res.status(403).send("You must be logged in to create a new URL.");
   }
 });
