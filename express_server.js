@@ -1,65 +1,46 @@
 const express = require("express");
+const cookieParser = require("cookie-parser");
 const app = express();
 const PORT = 8080; // default port 8080
 app.set("view engine", "ejs"); //EJS
-const cookieParser = require("cookie-parser");
 app.use(cookieParser());
+app.use(express.urlencoded({ extended: true })); //Parser to convert buffer data into strings we can use 
 
-const urlDatabase = {
-  b2xVn2: {
-    longURL: "http://www.lighthouselabs.ca",
-    userID: "userRandomID",
-  },
-  asm5xK: {
-    longURL: "http://www.google.com",
-    userID: "user2RandomID",
-  },
-};
+const urlDatabase = {};
 
-const users = {
-  userRandomID: {
-    id: "userRandomID",
-    email: "user@example.com",
-    password: "purple-monkey-dinosaur",
-  },
-  user2RandomID: {
-    id: "user2RandomID",
-    email: "user2@example.com",
-    password: "dishwasher-funk",
-  },
-};
+const users = {};
 
-function getUserUrls(userId) {
+function urlsForUser(id) {
   const userUrls = {};
   for (const shortURL in urlDatabase) {
-    if (urlDatabase[shortURL].userID === userId) {
+    if (urlDatabase[shortURL].userID === id) {
       userUrls[shortURL] = urlDatabase[shortURL];
     }
   }
   return userUrls;
 }
 
-app.use(express.urlencoded({ extended: true })); //Parser to convert buffer data into strings we can use 
+function generateRandomString() { //Creates the URL
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const charactersLength = characters.length;
+  let randomString = '';
+
+  for (let i = 0; i < 6; i++) {
+    const randomIndex = Math.floor(Math.random() * charactersLength);
+    randomString += characters.charAt(randomIndex);
+  }
+
+  return randomString;
+}
 
 app.get("/", (req, res) => {
-  res.send("Hello!");
+  if (req.cookies.user_id) {
+    return res.redirect("/urls")
+  }
+
+  res.redirect("/login")
 });
 
-app.get("/urls.json", (req, res) => {
-  res.json(urlDatabase);
-});
-
-app.get("/hello", (req, res) => {
-  res.send("<html><body>Hello <b>World</b></body></html>\n");
-});
-
-/**app.get("/register", (req, res) => { //Registration page
-  res.render("register");
-});
-
-app.get("/login", (req, res) => {
-  res.render("login");
-});**/
 
 app.get("/login", (req, res) => {
   const userId = req.cookies.user_id;
@@ -81,34 +62,28 @@ app.get("/register", (req, res) => {
     res.redirect("/urls");
   } else {
     // User is not logged in
-    res.render("register");
+    res.render("register", { user });
   }
 });
 
 app.get("/urls", (req, res) => {
   const userId = req.cookies["user_id"];
   const user = users[userId];
-  const userUrls = getUserUrls(userId); // Helper function to get URLs for a specific user
+
+  if (!user) {
+    // User is not logged in, display an error message or prompt
+    return res.render("error", { user, message: "Please log in or register to view your URLs." });
+  }
+
+  // User is logged in, display their URLs
+  const userUrls = urlsForUser(userId);
   const templateVars = {
     user,
     urls: userUrls,
   };
   res.render("urls_index", templateVars);
+
 });
-
-
-
-/**app.get("/urls/new", (req, res) => { //Connects to form to make new URL, has to be shown before urls/id
-  res.render("urls_new"); 
-});
-
-app.get("/urls/:id", (req, res) => { //Connects to single URL (replaced by ID)
-  const id = req.params.id; // Extract the id from the URL
-  const longURL = urlDatabase[id]; // Retrieve the long URL from the urlDatabase using the id as the key
-  const templateVars = { id: id, longURL: longURL }; // Create the templateVars object to pass to the template
-  res.render("urls_show", templateVars);
-}); **/
-
 
 app.get("/urls/new", (req, res) => {
   const userId = req.cookies["user_id"];
@@ -126,38 +101,64 @@ app.get("/urls/new", (req, res) => {
 
 app.get("/urls/:id", (req, res) => {
   const id = req.params.id;
-  const urlInfo = urlDatabase[id]; // Get the entire object 
-  const longURL = urlInfo ? urlInfo.longURL : undefined; // Access longURL property 
+  const urlInfo = urlDatabase[id];
   const userId = req.cookies["user_id"];
   const user = users[userId];
+
+  if (!user) {
+    // User is not logged in, display an error message or prompt
+    return res.render("error", { user, message: "Please log in or register to view this URL." });
+  }
+
+  if (!urlInfo) {
+    // URL does not exist
+    return res.render("error", { user, message: "URL does not exist" });
+  }
+
+  if (urlInfo.userID !== userId) {
+    // URL does not belong to the logged-in user, display an error message or prompt
+    return res.render("error", { user, message: "You do not own this URL." })
+  }
+
+  // URL belongs to the logged-in user, render the URLs_show template
+  const longURL = urlInfo.longURL;
   const templateVars = { id, longURL, user };
   res.render("urls_show", templateVars);
+
 });
-
-
 
 //Redirect
 app.get("/u/:id", (req, res) => {
   const shortURL = req.params.id;
-  const longURL = urlDatabase[shortURL];
-  if (longURL) {
-    res.redirect(longURL);
+  const urlInfo = urlDatabase[shortURL];
+  const userID = req.cookies.user_id;
+  const user = users[userID];
+
+  if (urlInfo) {
+    const longURL = urlInfo.longURL;
+    // Check if the longURL starts with "http://" or "https://"
+    if (!/^https?:\/\//i.test(longURL)) {
+      // If the protocol is missing, prepend "http://" before redirecting
+      res.redirect("http://" + longURL);
+    } else {
+      res.redirect(longURL);
+    }
   } else {
-    res.status(404).send("Short URL not found");
+    res.status(404).render("error", { user, message: "Short URL not found" });
   }
 });
 
 app.post("/register", (req, res) => {
   const { email, password } = req.body;
-// Error handling 
+  // Error handling 
   if (!email || !password) {
-    res.status(400).send("Email and password fields cannot be empty.");
+    res.status(400).render("error", { user: undefined, message: "Email and password fields cannot be empty." });
     return;
   }
   // Existing account
   const user = Object.values(users).find((user) => user.email === email);
   if (user) {
-    res.status(400).send("Email already registered.");
+    res.status(400).render("error", { user: undefined, message: "Email already registered." });
     return;
   }
   // Generate a unique user ID and user
@@ -177,27 +178,22 @@ app.post("/register", (req, res) => {
 app.post("/login", (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
-    res.status(400).send("Email and password fields cannot be empty.");
-    return;
+    return res.status(400).render("error", { user: undefined, message: "Email and password fields cannot be empty." });
   }
 
   const user = Object.values(users).find((user) => user.email === email);
 
   if (!user) {
-    res.status(403).send("User with this email does not exist.");
-    return;
+    return res.status(403).render("error", { user: undefined, message: "User with this email does not exist." });
   }
   //  login check
   if (user.password !== password) {
-    res.status(403).send("Incorrect password.");
-    return;
+    return res.status(403).render("error", { user: undefined, message: "Incorrect password." });
   }
   // Cookie
   res.cookie("user_id", user.id);
   res.redirect("/urls");
 });
-
-
 
 app.post("/urls", (req, res) => {
   const userId = req.cookies["user_id"];
@@ -210,65 +206,66 @@ app.post("/urls", (req, res) => {
       urlDatabase[shortURL] = { longURL, userID: userId }; // Update the urlDatabase with the new structure
       res.redirect(`/urls/${shortURL}`);
     } else {
-      res.status(400).send("Invalid URL. Please provide a valid URL.");
+      res.status(400).render("error", { user, message: "Invalid URL. Please provide a valid URL." });
     }
   } else {
     // User is not logged in, respond with an error message
-    res.status(403).send("You must be logged in to create a new URL.");
+    res.status(403).render("error", { user, message: "You must be logged in to create a new URL." });
   }
 });
 
 //Delete URLs
 app.post("/urls/:id/delete", (req, res) => {
-  const shortURL = req.params.id; // Get the shortURL 
+  const shortURL = req.params.id;
+  const userId = req.cookies["user_id"];
+  const user = users[userId];
 
-  if (urlDatabase[shortURL]) {
-    // If the shortURL exists in the urlDatabase, remove it using the delete operator
-    delete urlDatabase[shortURL];
-    res.redirect("/urls"); 
+  if (!user) {
+    // User is not logged in, respond with an error message
+    res.status(403).send("You must be logged in to delete this URL.");
+  } else if (!urlDatabase[shortURL]) {
+    // URL does not exist, respond with an error message
+    res.status(404).send("URL not found.");
+  } else if (urlDatabase[shortURL].userID !== userId) {
+    // URL does not belong to the logged-in user, respond with an error message
+    res.status(403).send("You do not own this URL.");
   } else {
-    res.status(404).send("Short URL not found");
+    // If the shortURL exists in the urlDatabase and belongs to the logged-in user, remove it using the delete operator
+    delete urlDatabase[shortURL];
+    res.redirect("/urls");
   }
 });
 
 //Update URLs
 app.post("/urls/:id", (req, res) => {
-  const shortURL = req.params.id; // Get the shortURL from the request parameter 
-  const newLongURL = req.body.longURL; // Get the new longURL 
+  const shortURL = req.params.id;
+  const newLongURL = req.body.longURL;
+  const userId = req.cookies["user_id"];
+  const user = users[userId];
 
-  if (urlDatabase[shortURL]) {
-    urlDatabase[shortURL] = newLongURL;
-    res.redirect("/urls"); // Redirect the client back to the urls_index page
+  if (!user) {
+    // User is not logged in, respond with an error message
+    res.status(403).send("You must be logged in to update this URL.");
+  } else if (!urlDatabase[shortURL]) {
+    // URL does not exist, respond with an error message
+    res.status(404).send("URL not found.");
+  } else if (urlDatabase[shortURL].userID !== userId) {
+    // URL does not belong to the logged-in user, respond with an error message
+    res.status(403).send("You do not own this URL.");
   } else {
-    res.status(404).send("Short URL not found");
+    // URL belongs to the logged-in user, update the longURL in the urlDatabase
+    urlDatabase[shortURL].longURL = newLongURL;
+    res.redirect("/urls");
   }
 });
 
-//Logout
-/**app.post("/logout", (req, res) => {
-  res.clearCookie("user_id"); // Clear the 'username' cookie
-  res.redirect("/urls"); // Redirect the user back to the /urls page
-}); **/
 
+//Logout
 app.post("/logout", (req, res) => {
   res.clearCookie("user_id");
-  res.redirect("/login"); 
+  res.redirect("/login");
 });
-
 
 app.listen(PORT, () => {
   console.log(`Example app listening on port ${PORT}!`);
 });
-
-function generateRandomString() { //Creates the URL 
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  const charactersLength = characters.length;
-  let randomString = '';
-
-  for (let i = 0; i < 6; i++) {
-    const randomIndex = Math.floor(Math.random() * charactersLength);
-    randomString += characters.charAt(randomIndex);
-  }
-
-  return randomString;
-}
