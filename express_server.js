@@ -36,12 +36,36 @@ app.get("/hello", (req, res) => {
   res.send("<html><body>Hello <b>World</b></body></html>\n");
 });
 
-app.get("/register", (req, res) => { //Registration page
+/**app.get("/register", (req, res) => { //Registration page
   res.render("register");
 });
 
 app.get("/login", (req, res) => {
   res.render("login");
+});**/
+
+app.get("/login", (req, res) => {
+  const userId = req.cookies.user_id;
+  const user = users[userId];
+  if (user) {
+    // User is already logged in
+    res.redirect("/urls");
+  } else {
+    // User is not logged in
+    res.render("login");
+  }
+});
+
+app.get("/register", (req, res) => {
+  const userId = req.cookies.user_id;
+  const user = users[userId];
+  if (user) {
+    // User is already logged in
+    res.redirect("/urls");
+  } else {
+    // User is not logged in
+    res.render("register");
+  }
 });
 
 app.get("/urls", (req, res) => {
@@ -66,13 +90,16 @@ app.get("/urls/:id", (req, res) => { //Connects to single URL (replaced by ID)
   res.render("urls_show", templateVars);
 }); **/
 
+
 app.get("/urls/new", (req, res) => {
-  const userId = req.cookies["user_id"];
+  const userId = req.cookies.user_id;
   const user = users[userId];
-  const templateVars = {
-    user,
-  };
-  res.render("urls_new", templateVars);
+  if (user) {
+    // User is logged in
+    res.render("urls_new", { user });
+  } else { 
+    res.redirect("/login");
+  }
 });
 
 app.get("/urls/:id", (req, res) => {
@@ -84,11 +111,10 @@ app.get("/urls/:id", (req, res) => {
   res.render("urls_show", templateVars);
 });
 
-app.get("/u/:id", (req, res) => { //The actual redirects
-  const shortURL = req.params.id; // Get the shortURL from the request parameter 
-  const longURL = urlDatabase[shortURL]; // Look up the longURL from the urlDatabase 
+app.get("/u/:id", (req, res) => {
+  const shortURL = req.params.id;
+  const longURL = urlDatabase[shortURL];
   if (longURL) {
-    // If the longURL exists in the urlDatabase, redirect the user to the longURL
     res.redirect(longURL);
   } else {
     res.status(404).send("Short URL not found");
@@ -148,13 +174,22 @@ app.post("/login", (req, res) => {
 
 
 app.post("/urls", (req, res) => {
-  const longURL = req.body.longURL; // Get the long URL from the form submission
-  // Generate a unique short URL ID using the generateRandomString function
-  const shortURL = generateRandomString();
-  // Add the new URL to the urlDatabase with the generated short URL ID as the key
-  urlDatabase[shortURL] = longURL;
-  // Redirect the user to the URL show page for the newly created short URL
-  res.redirect(`/urls/${shortURL}`);
+  const userId = req.cookies.user_id;
+  const user = users[userId];
+  if (user) {
+    // User is logged in, allow URL creation
+    const longURL = req.body.longURL;
+    if (longURL) {
+      const shortURL = generateRandomString();
+      urlDatabase[shortURL] = longURL;
+      // Redirect the user 
+      res.redirect(`/urls/${shortURL}`);
+    } else {
+      res.status(400).send("Invalid URL. Please provide a valid URL.");
+    }
+  } else {
+    res.status(403).send("You must be logged in to create a new URL.");
+  }
 });
 
 //Delete URLs
