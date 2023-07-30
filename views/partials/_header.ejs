@@ -13,9 +13,20 @@
       <span class="navbar-toggler-icon"></span>
     </button>
     <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
-      <div class="navbar-nav">
+      <div class="navbar-nav mr-auto">
         <a class="nav-item nav-link" href="/urls">My URLs</a>
         <a class="nav-item nav-link" href="/urls/new">Create New URL</a>
+      </div>
+      <div class="navbar-nav ml-auto"> <!-- Move the user info to the right -->
+        <% if (user) { %>
+          <span class="navbar-text mr-3">Logged in as: <%= user.email %></span>
+          <form method="POST" action="/logout" class="form-inline">
+            <button class="btn btn-outline-light my-2 my-sm-0" type="submit">Logout</button>
+          </form>
+        <% } else { %>
+          <a href="/register" class="btn btn-outline-light text-light mr-2">Register</a>
+          <a href="/login" class="btn btn-outline-light text-light">Login</a>
+        <% } %>
       </div>
     </div>
   </nav>
